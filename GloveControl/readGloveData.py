@@ -15,8 +15,10 @@ def main():
 
             # 3. Daten verwenden
             gloveRight = data["GloveRight"]
-            print(f"Data: {gloveRight}")
+            print(f"Data Right Glove: {gloveRight}")
 
+            gloveLeft = data["GloveLeft"]
+            print(f"Data Left Glove: {gloveLeft}")
             # Beispielzugriff:
             #rx, ry, rz = gloveRight["pos"]
             #rspeed = gloveRight["speed"]
