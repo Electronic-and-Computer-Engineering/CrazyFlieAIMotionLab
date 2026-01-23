@@ -70,7 +70,7 @@ class GloveData:
         try:
             values = struct.unpack('<7h', data)
             # Werte extrahieren (Index 0 ist ID, 1-3 sind Positionen)
-            pos_x, pos_y, pos_z = values[1], values[2], values[3]
+            pos_x, pos_y, pos_z = values[1], values[3], values[2]
             
             speed_x, speed_y, speed_z = 0.0, 0.0, 0.0
 
