@@ -13,37 +13,33 @@ import cfMRB
 URI = "radio://0/33/2M/E7E7E7E7AA"  # Brushless URI
 
 ARMING_THRESHOLD = 200
+RESET_THRESHOLD = 300
 
 
 class DroneManager:
     def __init__(self):
         self.is_armed = False
+        self.ready_to_arm = True
 
-    def arm_drone(self):
+    def trigger_arm(self):
         cflib.crtp.init_drivers()
         with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
-            """
-            Sends the arming request to the Crazyflie.
-            """
+
             ps = PlatformService(scf.cf)
             
             if self.is_armed:
                 ps.send_arming_request(False)
+                print(">>> DISARMING SIGNAL AN DROHNE GESENDET <<<")
+                self.is_armed = False
 
             else:
-               ps.send_arming_request(True)
+                ps.send_arming_request(True)
+                print(">>> ARMING SIGNAL AN DROHNE GESENDET <<<")
+                self.is_armed = True
 
-    def trigger_arm(self):
-        """Hier kommt der tatsächliche Code rein, um die Drohne zu starten."""
-        print("\n" + "!"*40)
-        print(">>> ARMING SIGNAL AN DROHNE GESENDET <<<")
-        print("!"*40 + "\n")
-        
-        self.arm_drone()
-        self.is_armed = True
         
     def calculate_distance(self, pos1, pos2):
-            """Berechnet die euklidische Distanz zwischen zwei (x,y,z) Punkten."""
+            #Berechnet die euklidische Distanz zwischen zwei (x,y,z) Punkten.
             # Formel: Wurzel((x2-x1)^2 + (y2-y1)^2 + (z2-z1)^2)
             dx = pos1[0] - pos2[0]
             dy = pos1[1] - pos2[1]
@@ -53,17 +49,47 @@ class DroneManager:
             return math.sqrt(dx*dx + dy*dy + dz*dz)
     
     def check_arming_condition(self, pos_left, pos_right):
-        """Prüft Distanz und armed, falls Bedingungen erfüllt."""
+        #Prüft Distanz und armed, falls Bedingungen erfüllt
+
         dist = self.calculate_distance(pos_left, pos_right)
         
-        # Nur armen, wenn noch NICHT gearmed ist UND Distanz klein genug
-        if not self.is_armed:
-            print(f"Abstand: {dist:.2f} (Warte auf < {ARMING_THRESHOLD})")
-            if dist < ARMING_THRESHOLD:
+        if dist < ARMING_THRESHOLD:
+            if self.ready_to_arm:
                 self.trigger_arm()
-        else:
-            # Drohne ist schon an - hier könnte man Disarm-Logik einbauen
-            pass
+                self.ready_to_arm = False
+                print(f"Abstand: {dist:.2f} (Warte auf > {RESET_THRESHOLD})")
+
+        elif dist > RESET_THRESHOLD:
+            if not self.ready_to_arm:
+                print(f"Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal!")
+                self.ready_to_arm = True
+            
+        return dist
+    
+def check_arming_condition(self, pos_left, pos_right):
+        dist = self.calculate_distance(pos_left, pos_right)
+    
+        # FALL 1: Hände sind nah genug zusammen (Auslösen)
+        if dist < ARMING_THRESHOLD:
+            # Wir schalten NUR, wenn wir auch bereit sind
+            if self.ready_to_switch:
+                self.trigger_arm()
+                # WICHTIG: Jetzt sofort sperren!
+                self.ready_to_switch = False
+            else:
+                # Hier landen wir, wenn die Hände immer noch zusammen sind,
+                # aber wir den Befehl schon gesendet haben.
+                print(f"Abstand {dist:.0f} < {ARMING_THRESHOLD}: Warte auf Auseinandergehen...")
+
+        # FALL 2: Hände sind weit genug auseinander (Reset)
+        # Wir nehmen einen Wert, der etwas GRÖSSER ist als der Arming-Wert (Hysterese),
+        # damit es nicht flackert, wenn man genau bei 200 zittert.
+        elif dist > RESET_THRESHOLD:
+            if not self.ready_to_switch:
+                print(f">>> Reset: Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal! <<<")
+                self.ready_to_switch = True
+        
+        # --- LOGIK ENDE ---
             
         return dist
 
