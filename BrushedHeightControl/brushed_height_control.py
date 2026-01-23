@@ -298,6 +298,9 @@ def main() -> None:
                     active
                     and (landing or target_height_cmd > LANDING_CUTOFF_M or last_height > LANDING_CUTOFF_M)
                 )
+                if sample.y == 0:
+                    in_flight = not active
+                
         #        if have_pose and last_pose_change_time > 0.0 and in_flight:
         #            if (now - last_pose_change_time) > POSE_STALE_S:
         #                if not emergency:
