@@ -22,12 +22,21 @@ class DroneManager:
     def __init__(self):
         self.is_armed = False
         self.ready_to_arm = True
+        self.external_scf = None
 
     def trigger_arm(self):
-        cflib.crtp.init_drivers()
-        with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
+        # Wenn wir eine externe Verbindung haben (vom Main-Loop), nutzen wir die!
+        if self.external_scf is not None:
+            self.send_arm_command(self.external_scf)
+        else:
+            # Sonst machen wir eine neue auf (wie in deinem alten Skript)
+            cflib.crtp.init_drivers()
+            with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
+                self.send_arm_command(scf)
 
-            ps = PlatformService(scf.cf)
+
+    def send_arm_command(self, scf_obj):
+            ps = PlatformService(scf_obj.cf)
             
             if self.is_armed:
                 ps.send_arming_request(False)
