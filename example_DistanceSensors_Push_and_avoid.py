@@ -13,8 +13,8 @@ from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.utils import uri_helper
 from cflib.crazyflie.log import LogConfig
+from cflib.crazyflie.platformservice import PlatformService
 
-import cfMRB
 
 # URI to the Crazyflie to connect to
 URI = "radio://0/33/2M/E7E7E7E7AA"
@@ -104,11 +104,12 @@ class PushDemo:
 
         # Arm motors
         print("Arming brushless motors...")
-        cfMRB.start_motors(self._scf, 5000)
+        ps = PlatformService(self._scf.cf)
+        ps.send_arming_request(True)
         time.sleep(1)
         
         # Release manual override to let High Level Commander take over
-        self._cf.param.set_value('motorPowerSet.enable', '0')
+        # self._cf.param.set_value('motorPowerSet.enable', '0')
 
         print("Taking off...")
         commander = self._cf.high_level_commander
@@ -180,9 +181,9 @@ class PushDemo:
             time.sleep(2)
             commander.stop()
             
-            # Stop motors hack
+            # Stop motors
             print("Stopping motors...")
-            cfMRB.stop_motors(self._scf)
+            ps.arming_request(False)
             
 
     def _start_plot(self):
