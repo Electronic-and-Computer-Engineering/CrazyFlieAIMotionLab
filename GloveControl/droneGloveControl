@@ -1,0 +1,187 @@
+import time
+import math
+
+import sys
+sys.path.append("../CrazyFlieAIMotionLab")
+import cfMRB
+
+from getGloveData import GloveData
+from printTerminal import PrintTerminal
+
+import cflib.crtp
+from cflib.crazyflie import Crazyflie
+from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
+from cflib.crazyflie.platformservice import PlatformService
+
+URI = "radio://0/33/2M/E7E7E7E7AA"  # Brushless URI
+
+ARMING_THRESHOLD = 200  # Hands closer that 200mm
+RESET_THRESHOLD = 300   # Hands farther away than 300mm
+
+MAX_SPEED = 0.5   # Maximale Geschwindigkeit in m/s (0.5 ist sicher für Innenräume)
+GAIN = 1.0        # Proportional-Faktor (Wie aggressiv die Drohne beschleunigt)
+URI = 'radio://0/80/2M/E7E7E7E7E7' # Beispiel URI
+HEIGHT = 0.5      # Schwebehöhe in Metern
+
+terminal = PrintTerminal()
+
+class DroneManager:
+    def __init__(self):
+        self.is_armed = False
+        self.ready_to_arm = True
+        self.start_pos = (0,0,0)
+
+    def trigger_arm(self):
+        cflib.crtp.init_drivers()
+        with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
+
+            ps = PlatformService(scf.cf)
+            
+            if self.is_armed:
+                ps.send_arming_request(False)
+                terminal.addLine(">>> DISARMING SIGNAL AN DROHNE GESENDET <<<")
+                self.is_armed = False
+
+            else:
+                ps.send_arming_request(True)
+                terminal.addLine(">>> ARMING SIGNAL AN DROHNE GESENDET <<<")
+                self.is_armed = True
+
+        
+    def calculate_distance(self, pos1, pos2):
+            #Berechnet die euklidische Distanz zwischen zwei (x,y,z) Punkten.
+            # Formel: Wurzel((x2-x1)^2 + (y2-y1)^2 + (z2-z1)^2)
+            dx = pos1[0] - pos2[0]
+            dy = pos1[1] - pos2[1]
+            dz = pos1[2] - pos2[2]
+            distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+            terminal.addLine(f"Abstand: {distance:.2f}")
+            return math.sqrt(dx*dx + dy*dy + dz*dz)
+    
+    def check_arming_condition(self, pos_left, pos_right):
+        #Prüft Distanz und armed, falls Bedingungen erfüllt
+
+        dist = self.calculate_distance(pos_left, pos_right)
+        
+        if dist < ARMING_THRESHOLD:
+            if self.ready_to_arm:
+                self.trigger_arm()
+                self.ready_to_arm = False
+                self.start_pos = pos_right
+                terminal.addLine(f"Abstand: {dist:.2f} (Warte auf > {RESET_THRESHOLD})")
+
+        elif dist > RESET_THRESHOLD:
+            if not self.ready_to_arm:
+                terminal.addLine(f"Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal!")
+                self.ready_to_arm = True
+            
+        return dist
+    
+    def move(self, target_pos):
+        """
+        Berechnet den Vektor und bewegt die Drohne.
+        
+        :param target_pos: Tuple oder Liste (x, y, z) des Zielobjekts
+        :param start_pos: Tuple oder Liste (x, y, z) des Startpunkts
+        """
+        if not self.is_armed:
+            return 0
+
+        # 1. Entpacken der Koordinaten
+        t_x, t_y, _ = target_pos
+        s_x, s_y, _ = self.start_pos
+
+        # 2. Vektor Berechnung (Delta)
+        dx = t_x - s_x
+        dy = t_y - s_y
+
+        # 3. Geschwindigkeit basierend auf Distanz berechnen (P-Regler)
+        # Je weiter weg, desto schneller (bis zum Limit)
+        vx = dx * GAIN
+        vy = dy * GAIN
+
+        # 4. Geschwindigkeit begrenzen (Clamping)
+        total_speed = math.sqrt(vx**2 + vy**2)
+
+        if total_speed > MAX_SPEED:
+            # Skalierungsfaktor berechnen, um Vektor-Richtung beizubehalten
+            scale = MAX_SPEED / total_speed
+            vx *= scale
+            vy *= scale
+
+        # Debugging (optional, gut zum Testen)
+        # print(f"Vector: ({dx:.2f}, {dy:.2f}) -> Command: ({vx:.2f}, {vy:.2f})")
+
+        # 5. Befehl senden
+        # HINWEIS: Siehe "Wichtige Anmerkung zur Performance" unten
+        with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
+            # yaw_rate ist 0.0 (keine Drehung), zdistance ist HEIGHT
+            scf.cf.commander.send_hover_setpoint(vx, vy, 0.0, HEIGHT)
+        
+        return 0
+        
+        
+    
+def check_arming_condition(self, pos_left, pos_right):
+        dist = self.calculate_distance(pos_left, pos_right)
+    
+        # FALL 1: Hände sind nah genug zusammen (Auslösen)
+        if dist < ARMING_THRESHOLD:
+            # Wir schalten NUR, wenn wir auch bereit sind
+            if self.ready_to_switch:
+                self.trigger_arm()
+                # WICHTIG: Jetzt sofort sperren!
+                self.ready_to_switch = False
+            else:
+                # Hier landen wir, wenn die Hände immer noch zusammen sind,
+                # aber wir den Befehl schon gesendet haben.
+                terminal.addLine(f"Abstand {dist:.0f} < {ARMING_THRESHOLD}: Warte auf Auseinandergehen...")
+
+        # FALL 2: Hände sind weit genug auseinander (Reset)
+        # Wir nehmen einen Wert, der etwas GRÖSSER ist als der Arming-Wert (Hysterese),
+        # damit es nicht flackert, wenn man genau bei 200 zittert.
+        elif dist > RESET_THRESHOLD:
+            if not self.ready_to_switch:
+                terminal.addLine(f">>> Reset: Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal! <<<")
+                self.ready_to_switch = True
+            
+        return dist
+    
+def main():
+    gloveTracker = GloveData()  # MotionLab data for gloves
+    drone = DroneManager()      # 
+
+    
+    print("Hauptprogramm gestartet. Warte auf 'Clap' zum Armen...")
+
+    try:
+        while True:
+            # 2. Daten abrufen
+            data = gloveTracker.get_data()
+            gloveRight = data["GloveRight"]
+            rx, ry, rz = gloveRight["pos"]
+            
+            gloveLeft = data["GloveLeft"]
+            lx, ly, lz = gloveLeft["pos"]
+
+            # Wir brauchen BEIDE Handschuhe für die Distanzberechnung
+            if not rx == 0 and not ry == 0 and not rz == 0 and not lx == 0 and not ly == 0 and not lz == 0:
+                pos_r = gloveRight["pos"]
+                pos_l = gloveLeft["pos"]
+                
+                # 3. Logik prüfen (via Funktionsaufruf)
+                drone.check_arming_condition(pos_l, pos_r)
+                
+                drone.move((rx, ry, rz))
+                
+            else:
+                 terminal.addLine("Warte auf Signal von beiden Handschuhen...")
+            
+            terminal.printAllLines()
+            time.sleep(0.1) 
+
+    except KeyboardInterrupt:
+        print("Beendet.")
+
+if __name__ == "__main__":
+    main() 

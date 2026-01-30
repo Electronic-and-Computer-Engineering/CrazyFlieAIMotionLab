@@ -5,6 +5,7 @@ import cflib.crtp
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.platformservice import PlatformService
+from printTerminal import PrintTerminal
 
 import sys
 sys.path.append("../CrazyFlieAIMotionLab")
@@ -15,26 +16,36 @@ URI = "radio://0/33/2M/E7E7E7E7AA"  # Brushless URI
 ARMING_THRESHOLD = 200
 RESET_THRESHOLD = 300
 
+terminal = PrintTerminal()
 
 class DroneManager:
     def __init__(self):
         self.is_armed = False
         self.ready_to_arm = True
+        self.external_scf = None
 
     def trigger_arm(self):
-        cflib.crtp.init_drivers()
-        with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
+        # Wenn wir eine externe Verbindung haben (vom Main-Loop), nutzen wir die!
+        if self.external_scf is not None:
+            self.send_arm_command(self.external_scf)
+        else:
+            # Sonst machen wir eine neue auf (wie in deinem alten Skript)
+            cflib.crtp.init_drivers()
+            with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
+                self.send_arm_command(scf)
 
-            ps = PlatformService(scf.cf)
+
+    def send_arm_command(self, scf_obj):
+            ps = PlatformService(scf_obj.cf)
             
             if self.is_armed:
                 ps.send_arming_request(False)
-                print(">>> DISARMING SIGNAL AN DROHNE GESENDET <<<")
+                terminal.addLine(">>> DISARMING SIGNAL AN DROHNE GESENDET <<<")
                 self.is_armed = False
 
             else:
                 ps.send_arming_request(True)
-                print(">>> ARMING SIGNAL AN DROHNE GESENDET <<<")
+                terminal.addLine(">>> ARMING SIGNAL AN DROHNE GESENDET <<<")
                 self.is_armed = True
 
         
@@ -45,7 +56,7 @@ class DroneManager:
             dy = pos1[1] - pos2[1]
             dz = pos1[2] - pos2[2]
             distance = math.sqrt(dx*dx + dy*dy + dz*dz)
-            print(f"Abstand: {distance:.2f}")
+            terminal.addLine(f"Abstand: {distance:.2f}")
             return math.sqrt(dx*dx + dy*dy + dz*dz)
     
     def check_arming_condition(self, pos_left, pos_right):
@@ -57,45 +68,19 @@ class DroneManager:
             if self.ready_to_arm:
                 self.trigger_arm()
                 self.ready_to_arm = False
-                print(f"Abstand: {dist:.2f} (Warte auf > {RESET_THRESHOLD})")
+                terminal.addLine(f"Abstand: {dist:.2f} (Warte auf > {RESET_THRESHOLD})")
 
         elif dist > RESET_THRESHOLD:
             if not self.ready_to_arm:
-                print(f"Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal!")
+                terminal.addLine(f"Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal!")
                 self.ready_to_arm = True
-            
-        return dist
-    
-def check_arming_condition(self, pos_left, pos_right):
-        dist = self.calculate_distance(pos_left, pos_right)
-    
-        # FALL 1: Hände sind nah genug zusammen (Auslösen)
-        if dist < ARMING_THRESHOLD:
-            # Wir schalten NUR, wenn wir auch bereit sind
-            if self.ready_to_switch:
-                self.trigger_arm()
-                # WICHTIG: Jetzt sofort sperren!
-                self.ready_to_switch = False
-            else:
-                # Hier landen wir, wenn die Hände immer noch zusammen sind,
-                # aber wir den Befehl schon gesendet haben.
-                print(f"Abstand {dist:.0f} < {ARMING_THRESHOLD}: Warte auf Auseinandergehen...")
-
-        # FALL 2: Hände sind weit genug auseinander (Reset)
-        # Wir nehmen einen Wert, der etwas GRÖSSER ist als der Arming-Wert (Hysterese),
-        # damit es nicht flackert, wenn man genau bei 200 zittert.
-        elif dist > RESET_THRESHOLD:
-            if not self.ready_to_switch:
-                print(f">>> Reset: Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal! <<<")
-                self.ready_to_switch = True
-        
-        # --- LOGIK ENDE ---
             
         return dist
 
 def main():
     gloveTracker = GloveData() #tracker for Gloves
     drone = DroneManager()
+
     
     print("Hauptprogramm gestartet. Warte auf 'Clap' zum Armen...")
 
@@ -118,8 +103,9 @@ def main():
                 drone.check_arming_condition(pos_l, pos_r)
                 
             else:
-                print("Warte auf Signal von beiden Handschuhen...")
-
+                 terminal.addLine("Warte auf Signal von beiden Handschuhen...")
+            
+            terminal.printAllLines()
             time.sleep(0.1) 
 
     except KeyboardInterrupt:
