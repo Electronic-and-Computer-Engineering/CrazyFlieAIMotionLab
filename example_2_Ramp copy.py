@@ -11,7 +11,7 @@ import cfMRB
 #   (matching your working hover test behavior).
 
 URI_BRUSHED   = "radio://0/80/2M/E7E7E7E7E7"  # brushed (AA)
-URI_BRUSHLESS = "radio://0/80/2M/E7E7E7E7AA"  # brushless (E7)
+URI_BRUSHLESS = "radio://0/33/2M/E7E7E7E7AA"  # brushless (E7)
 
 IS_BRUSHLESS = True
 URI = URI_BRUSHLESS if IS_BRUSHLESS else URI_BRUSHED

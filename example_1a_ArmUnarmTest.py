@@ -6,13 +6,13 @@ from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 import cfMRB
 
 URI = "radio://0/33/2M/E7E7E7E7AA"  # Brushless URI
-duration = 10
+duration = 3
 
 def main():
     cflib.crtp.init_drivers()
     with SyncCrazyflie(URI, cf=Crazyflie(rw_cache="./cache")) as scf:
         print("Connected to drone.")
-        cfMRB.start_motors(scf)
+        cfMRB.start_motors(scf,5000)
         time.sleep(duration)
         cfMRB.stop_motors(scf)
     print("Disconnected.")
