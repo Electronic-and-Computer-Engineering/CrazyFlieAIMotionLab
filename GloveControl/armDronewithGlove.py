@@ -76,33 +76,6 @@ class DroneManager:
                 self.ready_to_arm = True
             
         return dist
-    
-def check_arming_condition(self, pos_left, pos_right):
-        dist = self.calculate_distance(pos_left, pos_right)
-    
-        # FALL 1: Hände sind nah genug zusammen (Auslösen)
-        if dist < ARMING_THRESHOLD:
-            # Wir schalten NUR, wenn wir auch bereit sind
-            if self.ready_to_switch:
-                self.trigger_arm()
-                # WICHTIG: Jetzt sofort sperren!
-                self.ready_to_switch = False
-            else:
-                # Hier landen wir, wenn die Hände immer noch zusammen sind,
-                # aber wir den Befehl schon gesendet haben.
-                terminal.addLine(f"Abstand {dist:.0f} < {ARMING_THRESHOLD}: Warte auf Auseinandergehen...")
-
-        # FALL 2: Hände sind weit genug auseinander (Reset)
-        # Wir nehmen einen Wert, der etwas GRÖSSER ist als der Arming-Wert (Hysterese),
-        # damit es nicht flackert, wenn man genau bei 200 zittert.
-        elif dist > RESET_THRESHOLD:
-            if not self.ready_to_switch:
-                terminal.addLine(f">>> Reset: Abstand {dist:.0f} > {RESET_THRESHOLD}. Bereit für neues Signal! <<<")
-                self.ready_to_switch = True
-        
-        # --- LOGIK ENDE ---
-            
-        return dist
 
 def main():
     gloveTracker = GloveData() #tracker for Gloves
