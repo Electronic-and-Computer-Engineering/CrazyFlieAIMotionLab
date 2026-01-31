@@ -102,8 +102,8 @@ Brushless: E7E7E7E7AA
 Use the following constants in all examples:
 
 ```python
-URI_BRUSHED   = "radio://0/80/2M/E7E7E7E7AA"
-URI_BRUSHLESS = "radio://0/33/2M/E7E7E7E7E7"
+URI_BRUSHED   = "radio://0/33/2M/E7E7E7E7E7"
+URI_BRUSHLESS = "radio://0/80/2M/E7E7E7E7AA"
 ``` 
 Never run CFClient and Python scripts simultaneously.
 
